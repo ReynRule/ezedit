@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EZEDIT – 이미지·동영상 용량/크기/편집</title>
+<meta name="description" content="서버 업로드 없이 브라우저에서 이미지·동영상 용량 줄이기, 크기 조절, 동영상 자르기, 음악 넣기(페이드)">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>EZEDIT</h1>
+  <p>파일은 서버로 올라가지 않고 이 브라우저 안에서만 처리됩니다.</p>
+  <nav role="tablist">
+    <button role="tab" data-tab="img" aria-selected="true">이미지</button>
+    <button role="tab" data-tab="vcomp" aria-selected="false">동영상 용량 줄이기</button>
+    <button role="tab" data-tab="vedit" aria-selected="false">동영상 편집</button>
+  </nav>
+</header>
+
+<main>
+<!-- ============ 이미지 ============ -->
+<section class="tab on" id="tab-img">
+  <label class="drop" id="imgDrop">
+    <input type="file" id="imgFiles" accept="image/*" multiple>
+    <b>이미지를 끌어다 놓거나 눌러서 선택</b><br>여러 장 가능 · JPG, PNG, WebP 등
+  </label>
+
+  <fieldset>
+    <legend>크기</legend>
+    <div class="grid">
+      <div class="f"><label for="imgMode">조절 방식</label>
+        <select id="imgMode">
+          <option value="scale">배율(%)</option>
+          <option value="width">가로 px (비율 유지)</option>
+          <option value="height">세로 px (비율 유지)</option>
+          <option value="exact">가로 × 세로 직접 지정</option>
+        </select></div>
+      <div class="f" data-m="scale"><label for="imgScale">배율 % (100 미만=축소, 초과=확대)</label>
+        <input type="number" id="imgScale" value="100" min="1" max="800"></div>
+      <div class="f" data-m="width exact" hidden><label for="imgW">가로 px</label>
+        <input type="number" id="imgW" value="1280" min="1"></div>
+      <div class="f" data-m="height exact" hidden><label for="imgH">세로 px</label>
+        <input type="number" id="imgH" value="720" min="1"></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>용량</legend>
+    <div class="grid">
+      <div class="f"><label for="imgFmt">저장 형식</label>
+        <select id="imgFmt">
+          <option value="keep">원본과 같게</option>
+          <option value="image/jpeg">JPG</option>
+          <option value="image/webp">WebP (용량 가장 작음)</option>
+          <option value="image/png">PNG (무손실)</option>
+        </select></div>
+      <div class="f"><label for="imgQ">화질 <span id="imgQv">80</span>%</label>
+        <input type="range" id="imgQ" min="5" max="100" value="80"></div>
+      <div class="f"><label for="imgTarget">목표 용량 KB (선택)</label>
+        <input type="number" id="imgTarget" min="5" placeholder="예: 500"></div>
+    </div>
+    <p class="hint">목표 용량을 넣으면 그 크기 이하가 되도록 화질을 자동으로 맞춥니다. PNG는 화질 조절이 안 되어 크기(px)로만 줄어듭니다.</p>
+  </fieldset>
+
+  <div class="row">
+    <button class="btn" id="imgRun" disabled>변환하기</button>
+    <button class="btn sub" id="imgAll" disabled>전부 다운로드</button>
+    <span class="hint" id="imgCount"></span>
+  </div>
+  <div class="results" id="imgResults"></div>
+</section>
+
+<!-- ============ 동영상 압축 ============ -->
+<section class="tab" id="tab-vcomp">
+  <label class="drop" id="vcDrop">
+    <input type="file" id="vcFile" accept="video/*,.mkv,.mov">
+    <b>동영상을 끌어다 놓거나 눌러서 선택</b><br>MP4, MOV, MKV, WebM 등 → MP4(H.264)로 저장
+  </label>
+  <video id="vcPrev" controls hidden></video>
+  <p class="hint" id="vcInfo"></p>
+
+  <fieldset>
+    <legend>압축 설정</legend>
+    <div id="vcQuality"></div>
+    <div class="grid">
+      <div class="f"><label for="vcFps">프레임레이트</label>
+        <select id="vcFps"><option value="">원본</option><option>30</option><option>24</option><option>15</option></select></div>
+      <div class="f"><label for="vcAud">소리</label>
+        <select id="vcAud"><option value="128k">유지 (128kbps)</option><option value="96k">유지 (96kbps)</option><option value="192k">유지 (192kbps)</option><option value="none">제거</option></select></div>
+    </div>
+    <p class="hint warn">브라우저에서 처리하므로 PC 성능에 따라 느립니다. (1분짜리 1080p ≈ 수 분) 급하면 속도를 '가장 빠름'으로 두세요.</p>
+  </fieldset>
+  <div class="row">
+    <button class="btn" id="vcRun" disabled>압축 시작</button>
+    <button class="btn sub" data-cancel hidden>취소</button>
+  </div>
+  <div id="vcOut"></div>
+</section>
+
+<!-- ============ 동영상 편집 ============ -->
+<section class="tab" id="tab-vedit">
+  <label class="drop" id="veDrop">
+    <input type="file" id="veFile" accept="video/*,.mkv,.mov">
+    <b>편집할 동영상을 끌어다 놓거나 눌러서 선택</b>
+  </label>
+  <video id="vePrev" controls hidden></video>
+  <p class="hint" id="veInfo"></p>
+
+  <fieldset>
+    <legend>구간 편집</legend>
+    <div class="grid">
+      <div class="f"><label for="veMode">방식</label>
+        <select id="veMode">
+          <option value="keep">이 구간만 남기기 (자르기)</option>
+          <option value="remove">이 구간 삭제하고 앞뒤 이어붙이기</option>
+          <option value="none">구간 편집 안 함</option>
+        </select></div>
+      <div class="f"><label for="veS">시작(초)</label>
+        <div class="row"><input type="number" id="veS" min="0" step="0.1" value="0" style="flex:1">
+        <button class="btn sub sm" id="veSnowS" type="button">현재 위치</button></div></div>
+      <div class="f"><label for="veE">끝(초)</label>
+        <div class="row"><input type="number" id="veE" min="0" step="0.1" value="0" style="flex:1">
+        <button class="btn sub sm" id="veSnowE" type="button">현재 위치</button></div></div>
+    </div>
+    <div class="row" style="margin-top:10px"><button class="btn sub sm" id="vePreview" type="button">선택 구간 미리보기</button>
+      <span class="hint" id="veDur"></span></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>음악 넣기</legend>
+    <label class="drop" id="muDrop" style="padding:12px">
+      <input type="file" id="muFile" accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg">
+      <span id="muName">음악 파일 선택 (선택 사항)</span>
+    </label>
+    <audio id="muPrev" controls hidden></audio>
+    <div class="grid" id="muOpts" style="margin-top:14px" hidden>
+      <div class="f"><label for="muMode">원본 소리와</label>
+        <select id="muMode"><option value="mix">섞기</option><option value="replace">음악으로 교체</option></select></div>
+      <div class="f"><label for="muOff">음악이 시작되는 영상 시점(초)</label>
+        <input type="number" id="muOff" min="0" step="0.1" value="0"></div>
+      <div class="f"><label for="muFrom">음악 파일에서 시작할 위치(초)</label>
+        <input type="number" id="muFrom" min="0" step="0.1" value="0"></div>
+      <div class="f"><label for="muVol">음악 볼륨 <span id="muVolV">100</span>%</label>
+        <input type="range" id="muVol" min="0" max="200" value="100"></div>
+      <div class="f"><label for="orVol">원본 볼륨 <span id="orVolV">100</span>%</label>
+        <input type="range" id="orVol" min="0" max="200" value="100"></div>
+      <div class="f"><label for="muFi">음악 페이드 인(초)</label>
+        <input type="number" id="muFi" min="0" step="0.1" value="0"></div>
+      <div class="f"><label for="muFo">음악 페이드 아웃(초)</label>
+        <input type="number" id="muFo" min="0" step="0.1" value="2"></div>
+      <div class="f" style="justify-content:end"><label class="chk"><input type="checkbox" id="muLoop"> 영상보다 짧으면 반복</label></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>영상 페이드</legend>
+    <div class="grid">
+      <div class="f"><label for="vFi">페이드 인(초, 검은 화면에서 시작)</label>
+        <input type="number" id="vFi" min="0" step="0.1" value="0"></div>
+      <div class="f"><label for="vFo">페이드 아웃(초, 검은 화면으로 끝)</label>
+        <input type="number" id="vFo" min="0" step="0.1" value="0"></div>
+      <div class="f" style="justify-content:end"><label class="chk"><input type="checkbox" id="vFa" checked> 원본 소리도 같이 페이드</label></div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>저장 설정</legend>
+    <div id="veQuality"></div>
+  </fieldset>
+
+  <div class="row">
+    <button class="btn" id="veRun" disabled>편집본 만들기</button>
+    <button class="btn sub" data-cancel hidden>취소</button>
+  </div>
+  <div id="veOut"></div>
+</section>
+</main>
+
+<div id="status"><div class="in">
+  <div class="row" style="justify-content:space-between">
+    <strong id="stText">대기 중</strong>
+    <button class="btn sub sm" id="logBtn" type="button">로그 보기</button>
+  </div>
+  <div class="bar"><i id="stBar"></i></div>
+  <div id="log"></div>
+</div></div>
+
+<footer>
+  동영상 처리는 ffmpeg.wasm(단일 스레드)을 사용하며, 처음 동영상 기능을 쓸 때 약 30MB 엔진을 내려받습니다.
+</footer>
+
+<script src="vendor/util/index.js"></script>
+<script src="vendor/ffmpeg/ffmpeg.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
